@@ -1,0 +1,860 @@
+openapi: 3.0.3
+info:
+  title: SalesPilot AI API
+  description: >
+    REST API for SalesPilot AI — an AI-powered Sales & CRM platform.
+    All endpoints except /auth/register, /auth/login, /auth/forgot-password,
+    /auth/reset-password, and /auth/verify-email require a Bearer token.
+    Endpoints under an organization's data additionally require the
+    X-Organization-Id header identifying which organization to operate on.
+  version: "1.0.0"
+servers:
+  - url: /api
+security:
+  - bearerAuth: []
+    organizationHeader: []
+
+tags:
+  - name: Auth
+  - name: Leads
+  - name: Contacts
+  - name: Companies
+  - name: Deals
+  - name: Pipelines
+  - name: Tasks
+  - name: Activities
+  - name: Notes
+  - name: Calendar
+  - name: Analytics
+  - name: Reports
+  - name: AI
+  - name: Automation
+  - name: Notifications
+  - name: Billing
+  - name: Files
+  - name: Search
+  - name: Custom Fields
+  - name: Organizations
+  - name: Users
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Create a new user and organization
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [firstName, lastName, email, password, organizationName]
+              properties:
+                firstName: { type: string }
+                lastName: { type: string }
+                email: { type: string, format: email }
+                password: { type: string, minLength: 8 }
+                organizationName: { type: string }
+      responses:
+        '201':
+          description: Account created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  user: { $ref: '#/components/schemas/UserSummary' }
+                  defaultOrganizationId: { type: string, format: uuid }
+        '409': { description: Email already registered }
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Log in with email and password
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string, format: email }
+                password: { type: string }
+      responses:
+        '200':
+          description: Logged in
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  user: { $ref: '#/components/schemas/UserSummary' }
+                  defaultOrganizationId: { type: string, format: uuid }
+        '401': { description: Invalid credentials }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Log out (clears refresh token cookie)
+      responses:
+        '204': { description: Logged out }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get the current authenticated user
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  user: { $ref: '#/components/schemas/UserSummary' }
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Request a password reset email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200': { description: Reset email sent if the account exists }
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password using a token from the reset email
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token: { type: string }
+                password: { type: string, minLength: 8 }
+      responses:
+        '200': { description: Password reset }
+        '400': { description: Invalid or expired token }
+
+  /leads:
+    get:
+      tags: [Leads]
+      summary: List leads
+      parameters:
+        - in: query
+          name: page
+          schema: { type: integer, default: 1 }
+        - in: query
+          name: pageSize
+          schema: { type: integer, default: 25 }
+        - in: query
+          name: status
+          schema: { $ref: '#/components/schemas/LeadStatus' }
+        - in: query
+          name: search
+          schema: { type: string }
+      responses:
+        '200':
+          description: Paginated list of leads
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Lead' }
+                  total: { type: integer }
+    post:
+      tags: [Leads]
+      summary: Create a lead
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeadInput' }
+      responses:
+        '201':
+          description: Lead created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lead' }
+        '409': { description: Duplicate email }
+
+  /leads/{id}:
+    get:
+      tags: [Leads]
+      summary: Get a lead with activity, tasks, and notes
+      parameters: [{ $ref: '#/components/parameters/IdParam' }]
+      responses:
+        '200':
+          description: Lead detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lead' }
+        '404': { description: Not found }
+    patch:
+      tags: [Leads]
+      summary: Update a lead
+      parameters: [{ $ref: '#/components/parameters/IdParam' }]
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LeadInput' }
+      responses:
+        '200':
+          description: Updated lead
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lead' }
+    delete:
+      tags: [Leads]
+      summary: Soft-delete a lead
+      parameters: [{ $ref: '#/components/parameters/IdParam' }]
+      responses:
+        '204': { description: Deleted }
+
+  /leads/export:
+    get:
+      tags: [Leads]
+      summary: Export all leads as CSV
+      responses:
+        '200':
+          description: CSV file
+          content:
+            text/csv:
+              schema: { type: string }
+
+  /leads/import/preview:
+    post:
+      tags: [Leads]
+      summary: Preview a CSV file's headers and sample rows before import
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+      responses:
+        '200': { description: Headers and sample rows }
+
+  /leads/import:
+    post:
+      tags: [Leads]
+      summary: Import leads from CSV with a field-to-column mapping
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+                mapping: { type: string, description: 'JSON-encoded { crmField: csvHeader }' }
+      responses:
+        '200': { description: 'Import result: { imported, skipped, errors }' }
+
+  /leads/duplicates:
+    get:
+      tags: [Leads]
+      summary: List groups of leads sharing the same email
+      responses:
+        '200': { description: Duplicate groups }
+
+  /leads/merge:
+    post:
+      tags: [Leads]
+      summary: Merge duplicate leads into one
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keepId, mergeIds]
+              properties:
+                keepId: { type: string, format: uuid }
+                mergeIds: { type: array, items: { type: string, format: uuid } }
+      responses:
+        '200': { description: The kept lead after merge }
+
+  /contacts:
+    get:
+      tags: [Contacts]
+      summary: List contacts
+      responses:
+        '200': { description: Paginated list of contacts }
+    post:
+      tags: [Contacts]
+      summary: Create a contact
+      responses:
+        '201': { description: Contact created }
+
+  /contacts/{id}:
+    get:
+      tags: [Contacts]
+      summary: Get a contact with deals and activity
+      parameters: [{ $ref: '#/components/parameters/IdParam' }]
+      responses:
+        '200': { description: Contact detail }
+
+  /companies:
+    get:
+      tags: [Companies]
+      summary: List companies
+      responses:
+        '200': { description: Paginated list of companies }
+    post:
+      tags: [Companies]
+      summary: Create a company
+      responses:
+        '201': { description: Company created }
+
+  /companies/{id}:
+    get:
+      tags: [Companies]
+      summary: Get a company with contacts, deals, and activity
+      parameters: [{ $ref: '#/components/parameters/IdParam' }]
+      responses:
+        '200': { description: Company detail }
+
+  /deals:
+    get:
+      tags: [Deals]
+      summary: List deals
+      parameters:
+        - in: query
+          name: pipelineId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: stageId
+          schema: { type: string, format: uuid }
+        - in: query
+          name: status
+          schema: { type: string, enum: [open, won, lost] }
+      responses:
+        '200':
+          description: Paginated list of deals
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Deal' }
+                  total: { type: integer }
+    post:
+      tags: [Deals]
+      summary: Create a deal
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DealInput' }
+      responses:
+        '201':
+          description: Deal created
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Deal' }
+
+  /deals/{id}:
+    get:
+      tags: [Deals]
+      summary: Get a deal with pipeline, activity, tasks, and notes
+      parameters: [{ $ref: '#/components/parameters/IdParam' }]
+      responses:
+        '200':
+          description: Deal detail
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Deal' }
+
+  /deals/{id}/move:
+    patch:
+      tags: [Deals]
+      summary: Move a deal to a different pipeline stage
+      parameters: [{ $ref: '#/components/parameters/IdParam' }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stageId]
+              properties:
+                stageId: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Updated deal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Deal' }
+
+  /pipelines:
+    get:
+      tags: [Pipelines]
+      summary: List pipelines with their stages
+      responses:
+        '200': { description: Pipelines with stages }
+
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: List tasks
+      parameters:
+        - in: query
+          name: view
+          schema: { type: string, enum: [mine, team, overdue, upcoming, completed] }
+      responses:
+        '200': { description: Paginated list of tasks }
+    post:
+      tags: [Tasks]
+      summary: Create a task
+      responses:
+        '201': { description: Task created }
+
+  /tasks/{id}:
+    patch:
+      tags: [Tasks]
+      summary: Update a task (status, priority, due date, etc.)
+      parameters: [{ $ref: '#/components/parameters/IdParam' }]
+      responses:
+        '200': { description: Updated task }
+
+  /activities:
+    get:
+      tags: [Activities]
+      summary: List activities for a lead/contact/company/deal
+      responses:
+        '200': { description: Paginated list of activities }
+    post:
+      tags: [Activities]
+      summary: Log an activity (call, email, meeting, follow-up, note)
+      responses:
+        '201': { description: Activity logged }
+
+  /notes:
+    get:
+      tags: [Notes]
+      summary: List notes for a lead/contact/company/deal
+      responses:
+        '200': { description: List of notes }
+    post:
+      tags: [Notes]
+      summary: Add a note
+      responses:
+        '201': { description: Note created }
+
+  /calendar:
+    get:
+      tags: [Calendar]
+      summary: Get a unified feed of task due-dates and call/meeting activities in a date range
+      parameters:
+        - in: query
+          name: start
+          required: true
+          schema: { type: string, format: date-time }
+        - in: query
+          name: end
+          required: true
+          schema: { type: string, format: date-time }
+      responses:
+        '200': { description: Calendar events }
+
+  /analytics/leads:
+    get:
+      tags: [Analytics]
+      summary: Lead analytics — volume, source performance, qualification/conversion rate
+      responses:
+        '200': { description: Lead analytics }
+
+  /analytics/sales:
+    get:
+      tags: [Analytics]
+      summary: Sales analytics — revenue, win rate, average deal size, sales cycle
+      responses:
+        '200': { description: Sales analytics }
+
+  /analytics/team:
+    get:
+      tags: [Analytics]
+      summary: Per-rep performance — calls, emails, meetings, deals won, revenue
+      responses:
+        '200': { description: Team analytics }
+
+  /analytics/funnel:
+    get:
+      tags: [Analytics]
+      summary: Pipeline funnel — deal count and value per stage
+      responses:
+        '200': { description: Funnel data }
+
+  /reports:
+    get:
+      tags: [Reports]
+      summary: List saved reports
+      responses:
+        '200': { description: Saved reports }
+    post:
+      tags: [Reports]
+      summary: Save a report configuration
+      responses:
+        '201': { description: Report saved }
+
+  /reports/preview:
+    post:
+      tags: [Reports]
+      summary: Run a report configuration without saving it
+      requestBody:
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReportConfig' }
+      responses:
+        '200': { description: Report results }
+
+  /ai/chat:
+    post:
+      tags: [AI]
+      summary: Send a message to the AI sales assistant (tool-calling enabled)
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message: { type: string }
+                conversationId: { type: string, format: uuid }
+      responses:
+        '200': { description: Assistant reply }
+        '503': { description: AI provider unavailable }
+
+  /ai/leads/{leadId}/score:
+    post:
+      tags: [AI]
+      summary: Score a lead (works without an AI key; AI enhances the explanation when configured)
+      parameters:
+        - in: path
+          name: leadId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Scored lead
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Lead' }
+
+  /ai/deals/{dealId}/analyze:
+    post:
+      tags: [AI]
+      summary: Run deal intelligence — health, risk, close probability, recommended action
+      parameters:
+        - in: path
+          name: dealId
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Analyzed deal
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Deal' }
+
+  /ai/forecast:
+    get:
+      tags: [AI]
+      summary: Weighted pipeline, best case, commit, win rate, sales cycle, revenue by month
+      responses:
+        '200': { description: Forecast data }
+
+  /ai/email:
+    post:
+      tags: [AI]
+      summary: Generate/rewrite an email
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intent, context]
+              properties:
+                intent: { type: string, enum: [cold_email, follow_up, rewrite, shorten, meeting_follow_up, proposal_follow_up, reactivation] }
+                tone: { type: string, enum: [Professional, Friendly, Persuasive, Concise, Consultative, Executive, Urgent] }
+                context: { type: string }
+                existingEmail: { type: string }
+      responses:
+        '200':
+          description: Generated email
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  subject: { type: string }
+                  body: { type: string }
+
+  /ai/summarize:
+    post:
+      tags: [AI]
+      summary: Generate an AI customer summary for a contact or company
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [entity, id]
+              properties:
+                entity: { type: string, enum: [contact, company] }
+                id: { type: string, format: uuid }
+      responses:
+        '200': { description: Summary text }
+
+  /automation:
+    get:
+      tags: [Automation]
+      summary: List automations
+      responses:
+        '200': { description: Automations with triggers and actions }
+    post:
+      tags: [Automation]
+      summary: Create an automation
+      responses:
+        '201': { description: Automation created }
+
+  /automation/run-inactivity-check:
+    post:
+      tags: [Automation]
+      summary: Manually run the deal-inactivity sweep (normally scheduled via platform cron)
+      responses:
+        '200': { description: 'Sweep result: { dealsFlagged }' }
+
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifications for the current user
+      responses:
+        '200': { description: 'Notifications and unread count' }
+
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark one notification as read
+      parameters: [{ $ref: '#/components/parameters/IdParam' }]
+      responses:
+        '200': { description: Updated notification }
+
+  /billing/subscription:
+    get:
+      tags: [Billing]
+      summary: Get the organization's current subscription and plan limits
+      responses:
+        '200': { description: Subscription detail }
+
+  /billing/usage:
+    get:
+      tags: [Billing]
+      summary: AI request usage and seat usage for the current billing period
+      responses:
+        '200': { description: Usage summary }
+
+  /files:
+    get:
+      tags: [Files]
+      summary: List uploaded files, optionally filtered by related record
+      responses:
+        '200': { description: Files with access URLs }
+    post:
+      tags: [Files]
+      summary: Upload a file (multipart), optionally attached to a lead/contact/company/deal
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file: { type: string, format: binary }
+                relatedType: { type: string, enum: [lead, contact, company, deal] }
+                relatedId: { type: string, format: uuid }
+      responses:
+        '201': { description: File uploaded }
+
+  /search:
+    get:
+      tags: [Search]
+      summary: Search across leads, contacts, companies, deals, and tasks
+      parameters:
+        - in: query
+          name: q
+          required: true
+          schema: { type: string }
+      responses:
+        '200': { description: Matching results }
+
+  /custom-fields:
+    get:
+      tags: [Custom Fields]
+      summary: List custom field definitions for an entity type
+      parameters:
+        - in: query
+          name: entity
+          schema: { type: string, enum: [LEAD, CONTACT, COMPANY, DEAL] }
+      responses:
+        '200': { description: Custom field definitions }
+    post:
+      tags: [Custom Fields]
+      summary: Create a custom field definition (Owner/Admin only)
+      responses:
+        '201': { description: Field created }
+
+  /custom-fields/values:
+    get:
+      tags: [Custom Fields]
+      summary: Get custom field values for a specific record
+      responses:
+        '200': { description: Field values }
+    put:
+      tags: [Custom Fields]
+      summary: Set (upsert) a custom field value for a record
+      responses:
+        '200': { description: Value saved }
+
+  /organizations/current:
+    get:
+      tags: [Organizations]
+      summary: Get the current organization's profile and settings
+      responses:
+        '200': { description: Organization detail }
+    patch:
+      tags: [Organizations]
+      summary: Update organization profile (Owner/Admin only)
+      responses:
+        '200': { description: Updated organization }
+
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Get the current user's profile
+      responses:
+        '200': { description: User profile }
+    patch:
+      tags: [Users]
+      summary: Update the current user's profile
+      responses:
+        '200': { description: Updated profile }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+    organizationHeader:
+      type: apiKey
+      in: header
+      name: X-Organization-Id
+      description: Required on every organization-scoped endpoint; identifies which organization's data to operate on.
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+
+  schemas:
+    UserSummary:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+
+    LeadStatus:
+      type: string
+      enum: [NEW, CONTACTED, QUALIFIED, UNQUALIFIED, NURTURING, CONVERTED, LOST]
+
+    LeadInput:
+      type: object
+      required: [firstName, lastName]
+      properties:
+        firstName: { type: string }
+        lastName: { type: string }
+        email: { type: string, format: email, nullable: true }
+        phone: { type: string, nullable: true }
+        companyName: { type: string, nullable: true }
+        jobTitle: { type: string, nullable: true }
+        industry: { type: string, nullable: true }
+        source: { type: string, nullable: true }
+        status: { $ref: '#/components/schemas/LeadStatus' }
+        estimatedValue: { type: number, nullable: true }
+        ownerId: { type: string, format: uuid, nullable: true }
+
+    Lead:
+      allOf:
+        - $ref: '#/components/schemas/LeadInput'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            leadScore: { type: integer, nullable: true, minimum: 0, maximum: 100 }
+            temperature: { type: string, enum: [HOT, WARM, COLD], nullable: true }
+            engagementScore: { type: integer, nullable: true }
+            buyingIntent: { type: string, nullable: true }
+            recommendedAction: { type: string, nullable: true }
+            aiScoreExplanation: { type: string, nullable: true }
+            createdAt: { type: string, format: date-time }
+
+    DealInput:
+      type: object
+      required: [name, pipelineId, stageId]
+      properties:
+        name: { type: string }
+        companyId: { type: string, format: uuid, nullable: true }
+        primaryContactId: { type: string, format: uuid, nullable: true }
+        value: { type: number, default: 0 }
+        currency: { type: string, default: USD }
+        pipelineId: { type: string, format: uuid }
+        stageId: { type: string, format: uuid }
+        expectedCloseDate: { type: string, format: date-time, nullable: true }
+        ownerId: { type: string, format: uuid, nullable: true }
+
+    Deal:
+      allOf:
+        - $ref: '#/components/schemas/DealInput'
+        - type: object
+          properties:
+            id: { type: string, format: uuid }
+            probability: { type: integer }
+            status: { type: string, enum: [open, won, lost] }
+            aiHealth: { type: string, enum: [healthy, needs_attention, at_risk], nullable: true }
+            aiCloseProbability: { type: number, nullable: true }
+            aiRecommendedAction: { type: string, nullable: true }
+            aiExplanation: { type: string, nullable: true }
+            createdAt: { type: string, format: date-time }
+
+    ReportConfig:
+      type: object
+      required: [metric, dimension]
+      properties:
+        metric: { type: string, enum: [revenue, deal_count, lead_count, conversion_rate, activity_count] }
+        dimension: { type: string, enum: [owner, source, industry, stage, month] }
+        dateRange:
+          type: string
+          enum: [last_7_days, last_30_days, last_90_days, this_month, this_quarter, this_year, all_time]
+          default: last_30_days

@@ -1,0 +1,56 @@
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: salespilot
+      POSTGRES_PASSWORD: salespilot
+      POSTGRES_DB: salespilot
+    ports:
+      - '5433:5432'
+    volumes:
+      - salespilot_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U salespilot']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  server:
+    build:
+      context: ./server
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: 4000
+      DATABASE_URL: postgresql://salespilot:salespilot@postgres:5432/salespilot
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-min-16-chars}
+      SESSION_SECRET: ${SESSION_SECRET:-change-me-in-production-min-16-chars}
+      APP_URL: http://localhost:5173
+      API_URL: http://localhost:4000
+      CORS_ORIGIN: http://localhost:5173
+      AI_PROVIDER: ${AI_PROVIDER:-none}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      STORAGE_PROVIDER: local
+    ports:
+      - '4000:4000'
+    volumes:
+      - salespilot_uploads:/app/uploads
+
+  client:
+    build:
+      context: ./client
+    restart: unless-stopped
+    depends_on:
+      - server
+    ports:
+      - '5173:5173'
+
+volumes:
+  salespilot_pgdata:
+  salespilot_uploads:

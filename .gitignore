@@ -1,0 +1,60 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+coverage/
+*.log
+.DS_Store
+.vscode/
+.idea/
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+
+# Generated Prisma seed artifacts
+server/prisma/seed.js
+server/prisma/seed.js.map
+
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+
+# Generated test artifacts
+client/playwright-report/
+client/test-results/
+test-results/
+
+
+# Local backup directories
+client-backup/
+
+
+# Generated Prisma seed artifacts
+server/prisma/seed.js
+server/prisma/seed.js.map
+
+
+# Generated test artifacts
+client/playwright-report/
+client/test-results/
+test-results/
+
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+
+# Generated Prisma seed artifacts
+server/prisma/seed.js
+server/prisma/seed.js.map
+
+
+# Local backups
+client-backup/
+
