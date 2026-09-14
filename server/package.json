@@ -19,7 +19,6 @@
     "@aws-sdk/client-s3": "^3.658.0",
     "@aws-sdk/s3-request-presigner": "^3.658.0",
     "@prisma/client": "^5.20.0",
-    "prisma": "^5.20.0",
     "bcrypt": "^6.0.0",
     "bcryptjs": "^2.4.3",
     "cookie-parser": "^1.4.6",
@@ -37,6 +36,7 @@
     "pino": "^9.4.0",
     "pino-http": "^10.3.0",
     "pino-pretty": "^11.2.2",
+    "prisma": "^5.20.0",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^9.0.1",
     "yaml": "^2.5.1",
@@ -58,7 +58,7 @@
     "@typescript-eslint/parser": "^7.18.0",
     "eslint": "^8.57.1",
     "tsx": "^4.19.1",
-    "typescript": "^5.6.2",
+    "typescript": "5.9.3",
     "vitest": "^2.1.1"
   }
 }
